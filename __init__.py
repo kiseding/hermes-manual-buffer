@@ -293,10 +293,11 @@ def _on_pre_gateway_dispatch(event: Any, gateway: Any = None, **_: Any) -> Optio
         if state is None:
             return None
         if command is not None:
-            # Let other slash commands keep working while buffering is active.
+            # 缓冲区处于收集中时，其他命令照常放行。
             return None
         max_messages = _int_setting("max_messages", 100)
         max_chars = _int_setting("max_chars", 50000)
+        batch_size = _int_setting("flush_batch_size", 10)
         current_count, current_chars = _buffer_stats(state)
         incoming = text.strip()
         media_urls, media_types = _event_media(event)
@@ -312,8 +313,13 @@ def _on_pre_gateway_dispatch(event: Any, gateway: Any = None, **_: Any) -> Optio
         state.messages.append(BufferedMessage(incoming, media_urls, media_types))
         count, chars = _buffer_stats(state)
 
-    if _truthy_setting("ack_messages", True):
-        return _control_response(event, gateway, f"已缓冲第 {count} 条消息（共 {chars} 个字符），发送 /{over_cmd} 结束。")
+    # 每满一批（默认 10 条）回复一次确认，避免刷屏；不足一批不打扰。
+    if _truthy_setting("ack_messages", True) and count % batch_size == 0:
+        return _control_response(
+            event,
+            gateway,
+            f"已缓冲 {count} 条消息，发送 /{over_cmd} 一起处理。",
+        )
     return {"action": "skip", "reason": "manual-buffered"}
 
 
