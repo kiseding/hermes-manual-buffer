@@ -1,0 +1,39 @@
+name: manual-buffer
+version: 0.1.0
+description: "Manual inbound message buffering for Hermes gateway: /begin, /over, /cancel, /preview."
+author: "manual-buffer contributors"
+hooks:
+  - pre_gateway_dispatch
+config_schema:
+  begin_command:
+    type: str
+    default: begin
+    description: "Slash command used to start buffering messages."
+  over_command:
+    type: str
+    default: over
+    description: "Slash command used to flush the buffered messages as one prompt."
+  cancel_command:
+    type: str
+    default: cancel
+    description: "Slash command used to discard the current buffer."
+  preview_command:
+    type: str
+    default: preview
+    description: "Slash command used to preview the current buffer."
+  max_messages:
+    type: int
+    default: 100
+    description: "Maximum number of messages to buffer per session."
+  max_chars:
+    type: int
+    default: 50000
+    description: "Maximum total characters to buffer per session."
+  flush_batch_size:
+    type: int
+    default: 10
+    description: "Maximum number of buffered messages to submit to Hermes per /over. Remaining messages stay buffered for the next /over."
+  ack_messages:
+    type: bool
+    default: true
+    description: "Send short acknowledgements when buffering control commands or buffered messages are received."
