@@ -116,7 +116,7 @@ def _parse_command(text: str) -> Tuple[Optional[str], str]:
 
 
 def _format_message(index: int, message: BufferedMessage) -> str:
-    parts = [f"[Message {index}]"]
+    parts = [f"【消息 {index}】"]
     text = message.text.strip()
     if text:
         parts.append(text)
@@ -124,9 +124,9 @@ def _format_message(index: int, message: BufferedMessage) -> str:
         media_lines = []
         for i, path in enumerate(message.media_urls):
             mtype = message.media_types[i] if i < len(message.media_types) else ""
-            label = mtype or "attachment"
+            label = mtype or "附件"
             media_lines.append(f"- {label}: {path}")
-        parts.append("Attachments:\n" + "\n".join(media_lines))
+        parts.append("附件：\n" + "\n".join(media_lines))
     return "\n".join(parts)
 
 
@@ -178,7 +178,7 @@ def _preview_text(state: BufferState, limit: int = 1200) -> str:
     body = "\n\n".join(_format_message(i + 1, msg) for i, msg in enumerate(state.messages))
     if len(body) > limit:
         body = body[:limit].rstrip() + "\n..."
-    return f"Manual buffer: {count} message(s), {chars} char(s).\n\n{body or '(empty)'}"
+    return f"手动消息缓冲区：共 {count} 条，{chars} 个字符。\n\n{body or '（空）'}"
 
 
 def _control_response(event: Any, gateway: Any, text: str) -> Dict[str, str]:
@@ -198,22 +198,22 @@ def _on_pre_gateway_dispatch(event: Any, gateway: Any = None, **_: Any) -> Optio
         return _control_response(
             event,
             gateway,
-            f"Manual buffer started. Send messages, then /{over_cmd} to process them together."
+            f"已开始手动收集消息。请继续发送内容，发送完用 /{over_cmd} 一起处理。"
         )
 
     if command == cancel_cmd:
         with _lock:
             state = _buffers.pop(key, None)
         if state is None:
-            return _control_response(event, gateway, "No active manual buffer to cancel.")
+            return _control_response(event, gateway, "当前没有待取消的手动消息缓冲区。")
         count, chars = _buffer_stats(state)
-        return _control_response(event, gateway, f"Manual buffer cancelled. Discarded {count} message(s), {chars} char(s).")
+        return _control_response(event, gateway, f"已取消手动收集，丢弃 {count} 条消息、{chars} 个字符。")
 
     if command == preview_cmd:
         with _lock:
             state = _buffers.get(key)
             if state is None:
-                return _control_response(event, gateway, "No active manual buffer.")
+                return _control_response(event, gateway, "当前没有手动消息缓冲区。")
             preview = _preview_text(state)
         return _control_response(event, gateway, preview)
 
@@ -227,9 +227,9 @@ def _on_pre_gateway_dispatch(event: Any, gateway: Any = None, **_: Any) -> Optio
                 if not state.messages:
                     _buffers.pop(key, None)
         if state is None:
-            return _control_response(event, gateway, f"No active manual buffer. Use /{begin_cmd} first.")
+            return _control_response(event, gateway, f"当前没有手动消息缓冲区，请先用 /{begin_cmd} 开始。")
         if not batch:
-            return _control_response(event, gateway, "Manual buffer is empty; nothing to process.")
+            return _control_response(event, gateway, "手动缓冲区为空，没有可处理的消息。")
         media_urls, media_types = _messages_media(batch)
         try:
             event.media_urls = media_urls
@@ -238,8 +238,8 @@ def _on_pre_gateway_dispatch(event: Any, gateway: Any = None, **_: Any) -> Optio
             pass
         combined = "\n\n".join(_format_message(i + 1, msg) for i, msg in enumerate(batch))
         prompt = (
-            "The user sent the following messages as one manually buffered batch. "
-            "Process this batch together as a single request. Any listed attachments are also attached to this turn.\n\n"
+            "用户以一批手动收集的形式发送了以下消息，请把它们当作一个整体请求来处理。"
+            "本条消息的附件已随本轮一并提交。\n\n"
             f"{combined}"
         )
 
@@ -306,14 +306,14 @@ def _on_pre_gateway_dispatch(event: Any, gateway: Any = None, **_: Any) -> Optio
             return _control_response(
                 event,
                 gateway,
-                f"Manual buffer limit reached ({current_count} message(s), {current_chars} char(s)). "
-                f"Use /{over_cmd} to process or /{cancel_cmd} to discard."
+                f"手动缓冲区已达上限（{current_count} 条消息、{current_chars} 个字符）。"
+                f"请用 /{over_cmd} 处理或 /{cancel_cmd} 放弃。"
             )
         state.messages.append(BufferedMessage(incoming, media_urls, media_types))
         count, chars = _buffer_stats(state)
 
     if _truthy_setting("ack_messages", True):
-        return _control_response(event, gateway, f"Buffered message {count} ({chars} char(s) total). Send /{over_cmd} when finished.")
+        return _control_response(event, gateway, f"已缓冲第 {count} 条消息（共 {chars} 个字符），发送 /{over_cmd} 结束。")
     return {"action": "skip", "reason": "manual-buffered"}
 
 
